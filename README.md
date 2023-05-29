@@ -2,6 +2,7 @@
 Qt：5.12.8
 opencv：3.4.14
 
+
 ## qt安装----------------------------------------------------------------------------------
 因为使用官网下载的版本始终安装失败，所以我可以直接使用命令行进行下载安装：
 
@@ -69,7 +70,7 @@ sudo /sbin/ldconfig -v
 
 
 ## Qt配置opencv------------------------------------------------------------
-1：首先创建Qt项目，使用qmake，创建完后打开.pro文件加入下图所示opencv库的路径
+- 1：首先创建Qt项目，使用qmake，创建完后打开.pro文件加入下图所示opencv库的路径
 ```shell
 QT       += core gui
 
@@ -109,7 +110,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 ```
 
-2 : 我们可以使用v4l2-ctl --list-devices来获取usb摄像头的节点:
+- 2: 我们可以使用v4l2-ctl --list-devices来获取usb摄像头的节点:
 ```shell
 root@teamhd:/home/teamhd/opencvTest_QT# sudo v4l2-ctl --list-devices
 C670i FHD Webcam (usb-fc800000.usb-1):
@@ -123,7 +124,7 @@ HIK 2K Camera: HIK 2K Camera (usb-xhci-hcd.3.auto-1):
 	/dev/media1
 ```
 
-3 : 打开main.cpp文件，输入以下代码
+- 3: 打开main.cpp文件，输入以下代码
 ```c++
 #include "mainwindow.h"
 #include <opencv2/opencv.hpp>
