@@ -209,38 +209,97 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
 }
 
 
-int main()
+int webcam_demo(NanoDet& detector, int cam_id)
 {
-   Mat image;
-   VideoCapture capture(0);
-   if (capture.isOpened())
+    cv::Mat image;
+    cv::VideoCapture cap(cam_id);
+    int height = detector.input_size[0];
+    int width = detector.input_size[1];
+    if (!cap.isOpened())
+    {
+        printf("failed to open camera %d", cam_id);
+        return -1;
+    }
+
+    while (true)
+    {
+        cap >> image;
+        object_rect effect_roi;
+        cv::Mat resized_img;
+        resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
+        auto results = detector.detect(resized_img, 0.4, 0.5);
+        draw_bboxes(image, results, effect_roi);
+        cv::waitKey(1);
+    }
+    return 0;
+}
+
+int video_demo(NanoDet& detector, const char* path)
+{
+    cv::Mat image;
+    cv::VideoCapture cap(path);
+    int height = detector.input_size[0];
+    int width = detector.input_size[1];
+
+    while (true)
+    {
+        cap >> image;
+        object_rect effect_roi;
+        cv::Mat resized_img;
+        resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
+        auto results = detector.detect(resized_img, 0.4, 0.5);
+        draw_bboxes(image, results, effect_roi);
+        cv::waitKey(1);
+    }
+    return 0;
+}
+
+
+int main_(int argc, char** argv)
+{
+   if (argc != 3)
    {
-       qDebug("camera open successfully!");
-   } else
-   {
-       qDebug("camera open failed!");
-       return 0;
+       fprintf(stderr, "usage: %s [mode] [path]. \n For webcam mode=0, path is cam id; \n For benchmark, mode=2 path=0.\n", argv[0]);
+       return -1;
    }
+
    NanoDet detector = NanoDet("/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.param", "/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.bin", true);
-   int height = detector.input_size[0];
-   int width = detector.input_size[1];
-
-   while (true)
+   int mode = atoi(argv[1]);
+   switch (mode)
    {
-       capture.read(OutputArray(image));
-       object_rect effect_roi;
-       cv::Mat resized_img;
-       resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
-       auto results = detector.detect(resized_img, 0.4, 0.5);
-       draw_bboxes(image, results, effect_roi);
+     case 0:
+     {
+        int cam_id = atoi(argv[2]);
+        webcam_demo(detector, cam_id);
+        break;
+     }
 
+     case 1:
+     {
+        const char* path = argv[2];
+        video_demo(detector, path);
+        break;
+     }
 
-       int key = waitKey(1);
-       if (key == 27)
-       {
-           qDebug("exitting...");
-           break;
-       }
+     default:
+     {
+         fprintf(stderr, "usage: %s [mode] [path]. \n For webcam mode=0, path is cam id; \n For benchmark, mode=2 path=0.\n", argv[0]);
+         break;
+     }
    }
    return 0;
 }
+
+
+int main()
+{
+    NanoDet detector = NanoDet("/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.param", "/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.bin", true);
+
+
+    //webcam_demo(detector, 0);
+
+    video_demo(detector, "/home/teamhd/Downloads/video_09_02_230317_nightOpen_reserved_TEST.mp4");
+    return 0;
+}
+
+
