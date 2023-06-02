@@ -84,7 +84,7 @@ const int color_list[2][3] =
     {236 ,176 , 31}
 };
 
-void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi)
+void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName)
 {
     static const char* class_names[] = { "box_close", "box_open"  };
 
@@ -127,10 +127,54 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
             cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255));
     }
 
-    cv::imshow("image", cv::InputArray(image));
+    cv::imshow(winName, cv::InputArray(image));
 }
 
+// dual cameras mode
+int webcam_demo(NanoDet& detector, int cam_id_1, int cam_id_2)
+{
+    cv::Mat image1, image2;
+    cv::VideoCapture cap1(cam_id_1), cap2(cam_id_2);
+    int height = detector.input_size[0];
+    int width = detector.input_size[1];
+    if (!cap1.isOpened())
+    {
+        printf("failed to open camera %d", cam_id_1);
+        return -1;
+    }
 
+    if (!cap2.isOpened())
+    {
+        printf("failed to open camera %d", cam_id_2);
+        return -1;
+    }
+
+    char* winName1 = new char[10]();
+    sprintf(winName1, "WIN_%d", cam_id_1);
+
+    char* winName2 = new char[10]();
+    sprintf(winName2, "WIN_%d", cam_id_2);
+
+    while (true)
+    {
+        cap1 >> image1;
+        object_rect effect_roi;
+        cv::Mat resized_img;
+        resize_uniform(image1, resized_img, cv::Size(width, height), effect_roi);
+        auto results = detector.detect(resized_img, 0.4, 0.5);
+        draw_bboxes(image1, results, effect_roi, winName1);
+        cv::waitKey(1);
+
+        cap2 >> image2;
+        resize_uniform(image2, resized_img, cv::Size(width, height), effect_roi);
+        results = detector.detect(resized_img, 0.4, 0.5);
+        draw_bboxes(image2, results, effect_roi, winName2);
+        cv::waitKey(1);
+    }
+    return 0;
+}
+
+// single camera mode
 int webcam_demo(NanoDet& detector, int cam_id)
 {
     cv::Mat image;
@@ -143,6 +187,9 @@ int webcam_demo(NanoDet& detector, int cam_id)
         return -1;
     }
 
+    char* winName = new char[10]();
+    sprintf(winName, "WIN_%d", cam_id);
+
     while (true)
     {
         cap >> image;
@@ -150,11 +197,13 @@ int webcam_demo(NanoDet& detector, int cam_id)
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
         auto results = detector.detect(resized_img, 0.4, 0.5);
-        draw_bboxes(image, results, effect_roi);
+        draw_bboxes(image, results, effect_roi, winName);
         cv::waitKey(1);
     }
     return 0;
 }
+
+
 
 int video_demo(NanoDet& detector, const char* path)
 {
@@ -170,7 +219,7 @@ int video_demo(NanoDet& detector, const char* path)
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
         auto results = detector.detect(resized_img, 0.4, 0.5);
-        draw_bboxes(image, results, effect_roi);
+        draw_bboxes(image, results, effect_roi, "video");
         cv::waitKey(1);
     }
     return 0;
@@ -179,9 +228,9 @@ int video_demo(NanoDet& detector, const char* path)
 
 int main(int argc, char** argv)
 {
-   if (argc != 3)
+   if (argc != 3 && argc != 4)
    {
-       fprintf(stderr, "usage: %s [mode] [path]. \n For webcam mode=0, path is cam id; \n For benchmark, mode=2 path=0.\n", argv[0]);
+       fprintf(stderr, "usage: %s [mode] [path]. \n For webcam mode=0, path is cam ids (single cam: e.g. 0, dual cams: e.g. 0 2); \n For video, mode=1 path=video.mp4.\n", argv[0]);
        return -1;
    }
 
@@ -191,8 +240,16 @@ int main(int argc, char** argv)
    {
      case 0:
      {
-        int cam_id = atoi(argv[2]);
-        webcam_demo(detector, cam_id);
+        if (argc == 3)
+        {
+          int cam_id = atoi(argv[2]);
+          webcam_demo(detector, cam_id);
+        } else if (argc == 4)
+        {
+           int cam_id_1 = atoi(argv[2]);
+           int cam_id_2 = atoi(argv[3]);
+           webcam_demo(detector, cam_id_1, cam_id_2);
+        }
         break;
      }
 
@@ -205,7 +262,7 @@ int main(int argc, char** argv)
 
      default:
      {
-         fprintf(stderr, "usage: %s [mode] [path]. \n For webcam mode=0, path is cam id; \n For benchmark, mode=2 path=0.\n", argv[0]);
+         fprintf(stderr, "usage: %s [mode] [path]. \n For webcam mode=0, path is cam ids (single cam: e.g. 0, dual cams: e.g. 0 2); \n For video, mode=1 path=video.mp4.\n", argv[0]);
          break;
      }
    }
@@ -218,7 +275,7 @@ int main_()
     NanoDet detector = NanoDet("/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.param", "/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.bin", true);
 
 
-    webcam_demo(detector, 0);
+    webcam_demo(detector, 0, 3);
 
     //video_demo(detector, "/home/teamhd/Downloads/video_09_02_230317_nightOpen_reserved_TEST.mp4");
     return 0;
