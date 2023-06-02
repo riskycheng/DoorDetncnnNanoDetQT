@@ -7,6 +7,79 @@
 #include <benchmark.h>
 // #include <iostream>
 
+float cal_iou(BoxInfo box1, BoxInfo box2) {
+    float ratio = 0.f;
+    auto box1_w = box1.x2 - box1.x1;
+    auto box1_h = box1.y2 - box1.y1;
+    auto box2_w = box2.x2 - box2.x1;
+    auto box2_h = box2.y2 - box2.y1;
+    // compute the area size
+    auto s1 = box1_w * box1_h;
+    auto s2 = box2_w * box2_h;
+
+    // compute the union box
+    auto left = std::max(box1.x1, box2.x1);
+    auto top = std::max(box1.y1, box2.y1);
+    auto right = std::min(box1.x2, box2.x2);
+    auto bottom = std::min(box1.y2, box2.y2);
+
+    // compute the box width and height
+    auto union_w = (right - left) > 0 ? (right - left) : 0;
+    auto union_h = (bottom - top) > 0 ? (bottom - top) : 0;
+
+    // compute the union size
+    auto union_size = union_w * union_h;
+    // compute the appended region size
+    auto total_size = s1 + s2 - union_size;
+    ratio = 1.0f * union_size / total_size;
+    return ratio;
+}
+
+
+std::vector<BoxInfo> mergeDecision(std::vector<BoxInfo> detections, float score_thresh, float nms_thresh) {
+    std::vector<BoxInfo> all_box;
+    for (auto &box: detections) {
+        auto score = box.score;
+        if (score > score_thresh) {
+            BoxInfo tmpBox = BoxInfo();
+            tmpBox.x1 = box.x1;
+            tmpBox.y1 = box.y1;
+            tmpBox.x2 = box.x2;
+            tmpBox.y2 = box.y2;
+            tmpBox.label = box.label;
+            tmpBox.score = box.score;
+            all_box.push_back(tmpBox);
+        }
+    }
+
+    sort(all_box.begin(), all_box.end(), [](const BoxInfo &lhs, const BoxInfo &rhs) {
+        return lhs.score > rhs.score;
+    });
+
+    std::vector<BoxInfo> refinedBoxes;
+    int index_of_box_a = 0;
+    for (auto box_a: all_box) {
+        for (auto box_b: all_box) {
+            auto iou = cal_iou(box_a, box_b);
+            if (box_a.label != box_b.label && iou >= nms_thresh) {
+                printf("merging performed !!!!!! overlapping detected \n");
+                if (box_a.label != 1) {
+                    all_box[index_of_box_a].label = -1;
+                }
+            }
+        }
+        index_of_box_a++;
+    }
+
+    // check all the item
+    for (auto item: all_box) {
+        if (item.label != -1) {
+            refinedBoxes.push_back(item);
+        }
+    }
+    return refinedBoxes;
+}
+
 inline float fast_exp(float x)
 {
     union {
@@ -136,11 +209,8 @@ std::vector<BoxInfo> NanoDet::detect(cv::Mat image, float score_threshold, float
         }
     }
 
-    //double end = ncnn::get_current_time();
-    //double time = end - start;
-    //printf("Detect Time:%7.2f \n", time);
-
-    return dets;
+    std::vector<BoxInfo> refinedBoxes = mergeDecision(dets, score_threshold, 0.05f); // no interaction at all
+    return refinedBoxes;
 }
 
 void NanoDet::decode_infer(ncnn::Mat& feats, std::vector<CenterPrior>& center_priors, float threshold, std::vector<std::vector<BoxInfo>>& results)
