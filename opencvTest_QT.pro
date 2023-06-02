@@ -10,6 +10,8 @@ CONFIG += c++11
 # deprecated API in order to know how to port your code away from it.
 DEFINES += QT_DEPRECATED_WARNINGS
 
+QMAKE_LFLAGS += -fopenmp
+QMAKE_CXXFLAGS+= -fopenmp
 # You can also make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
@@ -17,10 +19,12 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    nanodet.cpp
 
 HEADERS += \
-    mainwindow.h
+    mainwindow.h \
+    nanodet.h
 
 FORMS += \
     mainwindow.ui
@@ -28,8 +32,11 @@ FORMS += \
 
 INCLUDEPATH += /usr/local/include/ \
                /usr/local/include/opencv \
-               /usr/local/include/opencv2
-LIBS += /usr/local/lib/lib*
+               /usr/local/include/opencv2 \
+               ./ncnn_dependencies/include/ncnn
+
+LIBS += /usr/local/lib/lib* /home/teamhd/opencvTest_QT/ncnn_dependencies/lib/libncnn.a
+
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
