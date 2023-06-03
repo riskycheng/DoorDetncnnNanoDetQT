@@ -184,18 +184,22 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
     if (anyDoorOpen)
     {
         int baseLine = 0;
-        float fontScale = 0.4f;
+        float fontScale = 1.f;
         int fontFace = cv::FONT_HERSHEY_SIMPLEX;
-        int fontThickness = 1;
+        int fontThickness = 6;
         Scalar fontBorderColor(0, 255, 255);
         Scalar fontColor(255, 255, 255);
         Scalar fontBackground(0xf9, 0x8d, 0x85);
         const char* warningTxt = "Door Open!!";
         cv::Size txtSize = cv::getTextSize(warningTxt, fontFace, fontScale, fontThickness, &baseLine);
-        // render the outer rect
+
         int x = (image.cols - txtSize.width) / 2;
         int y = 100;
-        cv::rectangle(image, cv::Rect(cv::Point(x, y), cv::Size(txtSize.width, txtSize.height + baseLine)), fontBorderColor, 1);
+        // render the outer rect
+        int margin = 2;
+        cv::rectangle(image, cv::Rect(cv::Point(x - margin, y - margin), cv::Size(txtSize.width + 2 * margin, txtSize.height + baseLine + 2 * margin)), fontBorderColor, 2);
+        // render the inner rect
+        cv::rectangle(image, cv::Rect(cv::Point(x, y), cv::Size(txtSize.width, txtSize.height + baseLine)), fontBackground, -1);
         // render the inner text
         cv::putText(cv::InputOutputArray(image), warningTxt, cv::Point(x, y + txtSize.height),
                     cv::FONT_HERSHEY_SIMPLEX, fontScale, fontColor);
