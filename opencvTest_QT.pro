@@ -18,11 +18,14 @@ QMAKE_CXXFLAGS+= -fopenmp
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    jsoncpp.cpp \
     main.cpp \
     mainwindow.cpp \
     nanodet.cpp
 
 HEADERS += \
+    json-forwards.h \
+    json.h \
     mainwindow.h \
     nanodet.h
 
@@ -33,9 +36,10 @@ FORMS += \
 INCLUDEPATH += /usr/local/include/ \
                /usr/local/include/opencv \
                /usr/local/include/opencv2 \
-               ./ncnn_dependencies/include/ncnn
+               /usr/local/include/ncnn/include
 
-LIBS += /usr/local/lib/lib* /home/teamhd/opencvTest_QT/ncnn_dependencies/lib/libncnn.a
+LIBS += /usr/local/lib/lib* \
+        /usr/local/lib/libncnn.a \
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

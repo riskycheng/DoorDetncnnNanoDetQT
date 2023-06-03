@@ -1,11 +1,15 @@
 #include "mainwindow.h"
 #include <opencv2/opencv.hpp>
 #include <QDebug>
-#include <net.h>
+#include <ncnn/include/net.h>
 #include "nanodet.h"
 #include <vector>
+#include <json.h>
+#include <iostream>
+#include <fstream>
 
 using namespace std;
+using namespace Json;
 using namespace cv;
 
 struct object_rect {
@@ -14,6 +18,48 @@ struct object_rect {
     int width;
     int height;
 };
+
+
+struct DoorDet_config {
+    float det_threshold;
+};
+
+bool parseConfig(const char* filename, DoorDet_config& config)
+{
+    std::ifstream ifs;
+    ifs.open(filename);
+    if(!ifs.is_open()){
+        printf("failed to open this config file >>> %s\n", filename);
+        return false;
+    }
+
+    bool res;
+    Json::CharReaderBuilder readerBuilder;
+    string err_json;
+    Json::Value json_obj, lang, mail;
+    try{
+        bool ret = Json::parseFromStream(readerBuilder, ifs, &json_obj, &err_json);
+        if(!ret){
+            printf("invalid json file ! \n");
+            return false;
+        }
+    } catch(exception &e){
+        printf("exception while parse json file %s due to %s \n", filename, e.what());
+        return false;
+    }
+
+    // start parsing
+    float det_threshold = json_obj["det_threshold"].asFloat();
+
+
+    // check the configs
+    printf("parsed Configs STARTED\n");
+    printf("det_threshold:%.2f\n", det_threshold);
+    printf("parsed Configs ENDED\n");
+
+    return true;
+
+}
 
 int resize_uniform(cv::Mat& src, cv::Mat& dst, cv::Size dst_size, object_rect& effect_area)
 {
@@ -236,6 +282,17 @@ int main(int argc, char** argv)
 
    NanoDet detector = NanoDet("/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.param", "/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.bin", true);
    int mode = atoi(argv[1]);
+
+   DoorDet_config config;
+   bool ret = parseConfig("./config.json", config);
+   if (ret)
+   {
+       printf("config parsing successfully! \n");
+   } else
+   {
+       printf("warning : config parsing failed! \n");
+   }
+
    switch (mode)
    {
      case 0:
