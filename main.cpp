@@ -51,7 +51,7 @@ bool parseConfig(const char* filename, DoorDet_config& config)
 
     // start parsing
     float det_threshold = json_obj["det_threshold"].asFloat();
-
+    config.det_threshold = det_threshold;
 
     // check the configs
     printf("parsed Configs STARTED\n");
@@ -133,7 +133,7 @@ const int color_list[2][3] =
 
 void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName)
 {
-    static const char* class_names[] = { "box_close", "box_open"  };
+    static const char* class_names[] = {"box_close", "box_open"};
 
     cv::Mat image = bgr.clone();
     int src_w = image.cols;
@@ -143,10 +143,16 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
     float width_ratio = (float)src_w / (float)dst_w;
     float height_ratio = (float)src_h / (float)dst_h;
 
+    bool anyDoorOpen = false;
 
     for (size_t i = 0; i < bboxes.size(); i++)
     {
         const BoxInfo& bbox = bboxes[i];
+        if (bbox.label > 0)
+        {
+            // indicates it is open status
+            anyDoorOpen = true;
+        }
         cv::Scalar color = cv::Scalar(color_list[bbox.label][0], color_list[bbox.label][1], color_list[bbox.label][2]);
         //fprintf(stderr, "%d = %.5f at %.2f %.2f %.2f %.2f\n", bbox.label, bbox.score,
         //    bbox.x1, bbox.y1, bbox.x2, bbox.y2);
@@ -174,11 +180,33 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
             cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255));
     }
 
+    // render the warning box if needed
+    if (anyDoorOpen)
+    {
+        int baseLine = 0;
+        float fontScale = 0.4f;
+        int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+        int fontThickness = 1;
+        Scalar fontBorderColor(0, 255, 255);
+        Scalar fontColor(255, 255, 255);
+        Scalar fontBackground(0xf9, 0x8d, 0x85);
+        const char* warningTxt = "Door Open!!";
+        cv::Size txtSize = cv::getTextSize(warningTxt, fontFace, fontScale, fontThickness, &baseLine);
+        // render the outer rect
+        int x = (image.cols - txtSize.width) / 2;
+        int y = 100;
+        cv::rectangle(image, cv::Rect(cv::Point(x, y), cv::Size(txtSize.width, txtSize.height + baseLine)), fontBorderColor, 1);
+        // render the inner text
+        cv::putText(cv::InputOutputArray(image), warningTxt, cv::Point(x, y + txtSize.height),
+                    cv::FONT_HERSHEY_SIMPLEX, fontScale, fontColor);
+    }
+
     cv::imshow(winName, cv::InputArray(image));
 }
 
+
 // dual cameras mode
-int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_id_2)
+int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam_id_2)
 {
     cv::Mat image1, image2;
     cv::VideoCapture cap1(cam_id_1), cap2(cam_id_2);
@@ -208,13 +236,13 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image1, resized_img, cv::Size(width, height), effect_roi);
-        auto results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
+        auto results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
         draw_bboxes(image1, results, effect_roi, winName1);
         cv::waitKey(1);
 
         cap2 >> image2;
         resize_uniform(image2, resized_img, cv::Size(width, height), effect_roi);
-        results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
+        results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
         draw_bboxes(image2, results, effect_roi, winName2);
         cv::waitKey(1);
     }
@@ -222,7 +250,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
 }
 
 // single camera mode
-int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id)
+int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
 {
     cv::Mat image;
     cv::VideoCapture cap(cam_id);
@@ -243,7 +271,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id)
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
-        auto results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
+        auto results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
         draw_bboxes(image, results, effect_roi, winName);
         cv::waitKey(1);
     }
@@ -252,20 +280,20 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id)
 
 
 
-int video_demo(NanoDet& detector, const DoorDet_config config, const char* path)
+int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path)
 {
     cv::Mat image;
     cv::VideoCapture cap(path);
     int height = detector.input_size[0];
     int width = detector.input_size[1];
-
+    printf("config.thresh:%.2f\n", config->det_threshold);
     while (true)
     {
         cap >> image;
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
-        auto results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
+        auto results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
         draw_bboxes(image, results, effect_roi, "video");
         cv::waitKey(1);
     }
@@ -301,12 +329,12 @@ int main(int argc, char** argv)
         if (argc == 3)
         {
           int cam_id = atoi(argv[2]);
-          webcam_demo(detector, config, cam_id);
+          webcam_demo(detector, &config, cam_id);
         } else if (argc == 4)
         {
            int cam_id_1 = atoi(argv[2]);
            int cam_id_2 = atoi(argv[3]);
-           webcam_demo(detector, config, cam_id_1, cam_id_2);
+           webcam_demo(detector, &config, cam_id_1, cam_id_2);
         }
         break;
      }
@@ -314,7 +342,7 @@ int main(int argc, char** argv)
      case 1:
      {
         const char* path = argv[2];
-        video_demo(detector, config, path);
+        video_demo(detector, &config, path);
         break;
      }
 
@@ -342,7 +370,7 @@ int main_()
         printf("warning : config parsing failed! \n");
     }
 
-    webcam_demo(detector, config, 3);
+    webcam_demo(detector, &config, 3);
 
     //video_demo(detector, "/home/teamhd/Downloads/video_09_02_230317_nightOpen_reserved_TEST.mp4");
     return 0;
