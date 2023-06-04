@@ -197,7 +197,7 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
         int y = 100;
         // render the outer rect
         int margin = 2;
-        cv::rectangle(image, cv::Rect(cv::Point(x - margin, y - margin), cv::Size(txtSize.width + 2 * margin, txtSize.height + baseLine + 2 * margin)), fontBorderColor, 2);
+        cv::rectangle(image, cv::Rect(cv::Point(x - margin, y - margin), cv::Size(txtSize.width + 2 * margin, txtSize.height + baseLine + 2 * margin)), fontBorderColor, 4);
         // render the inner rect
         cv::rectangle(image, cv::Rect(cv::Point(x, y), cv::Size(txtSize.width, txtSize.height + baseLine)), fontBackground, -1);
         // render the inner text
@@ -236,19 +236,42 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
 
     while (true)
     {
+        // the flag whether the abnormal status detected
+        bool isAnyDoorOpen = false;
+
         cap1 >> image1;
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image1, resized_img, cv::Size(width, height), effect_roi);
         auto results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
         draw_bboxes(image1, results, effect_roi, winName1);
+        for (auto box : results)
+        {
+            if (box.label > 0)
+            {
+                isAnyDoorOpen = true;
+            }
+        }
         cv::waitKey(1);
 
         cap2 >> image2;
         resize_uniform(image2, resized_img, cv::Size(width, height), effect_roi);
         results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
         draw_bboxes(image2, results, effect_roi, winName2);
+        for (auto box : results)
+        {
+            if (box.label > 0)
+            {
+                isAnyDoorOpen = true;
+            }
+        }
         cv::waitKey(1);
+
+        // the summarized info
+        if (isAnyDoorOpen)
+        {
+            printf("WARNING: detected open door via the 2-ways-camera!!\n");
+        }
     }
     return 0;
 }
