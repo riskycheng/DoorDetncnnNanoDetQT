@@ -2,5 +2,7 @@
 "?det_threshold": "the conf lower than this will be discarded, ranging from 0.0 to 1.0, the higher the more strict",
 "det_threshold": 0.5,
 "?compute_every_frames": "compute the detection every N frames, indicates that N-1 frames will be skipped",
-"compute_every_frames": 30
+"compute_every_frames": 30,
+"?sync_results_frame": "if true, the frame won't be updated until the corresponding result computed, latency might be observed; if false, the results computed from previous frames will be inherit to this frame, misalignments might be observed for fast movements",
+"sync_results_frame": false
 }

@@ -24,6 +24,7 @@ struct object_rect {
 struct DoorDet_config {
     float det_threshold;
     int compute_every_frames;
+    bool sync_results_frame;
 };
 
 bool parseConfig(const char* filename, DoorDet_config& config)
@@ -55,11 +56,15 @@ bool parseConfig(const char* filename, DoorDet_config& config)
     config.det_threshold = det_threshold;
     int compute_every_frames = json_obj["compute_every_frames"].asInt();
     config.compute_every_frames = compute_every_frames;
+    bool sync_results_frame = json_obj["sync_results_frame"].asBool();
+    config.sync_results_frame = sync_results_frame;
+
 
     // check the configs
     printf("parsed Configs STARTED\n");
     printf("det_threshold:%.2f\n", config.det_threshold);
     printf("compute_every_frames:%d\n", config.compute_every_frames);
+    printf("sync_results_frame:%s\n", config.sync_results_frame ? "true" : "false");
     printf("parsed Configs ENDED\n");
 
     return true;
@@ -238,7 +243,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
     char* winName2 = new char[10]();
     sprintf(winName2, "WIN_%d", cam_id_2);
 
-    int64_t frameIndex;
+    int64_t frameIndex = -1;
     std::vector<BoxInfo> results;
     while (true)
     {
@@ -246,6 +251,11 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
         bool isAnyDoorOpen = false;
 
         cap1 >> image1;
+
+        frameIndex++;
+        if (frameIndex > 10000)
+            frameIndex = 0;
+
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image1, resized_img, cv::Size(width, height), effect_roi);
@@ -256,6 +266,8 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
         } else
         {
             printf("this frame %d is skipped\n", frameIndex);
+            if (config->sync_results_frame)
+                continue;
         }
         draw_bboxes(image1, results, effect_roi, winName1);
 
@@ -294,7 +306,6 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
         {
             printf("WARNING: detected open door via the 2-ways-camera!!\n");
         }
-        frameIndex++;
     }
     return 0;
 }
@@ -316,26 +327,29 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
     sprintf(winName, "WIN_%d", cam_id);
 
     std::vector<BoxInfo> results;
-    int frameIndex = 0;
+    int frameIndex = -1;
     while (true)
     {
         cap >> image;
+        frameIndex++;
+        if (frameIndex > 10000)
+            frameIndex = 0;
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
 
-        if (frameIndex % config->compute_every_frames == 0)
+        if (frameIndex % config->compute_every_frames == 0 || frameIndex < 0)
         {
+            printf("this frame %d is computed\n", frameIndex);
             results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
         } else
         {
             printf("this frame %d is skipped\n", frameIndex);
+            if (config->sync_results_frame)
+                continue;
         }
         draw_bboxes(image, results, effect_roi, winName);
         cv::waitKey(1);
-        frameIndex++;
-        if (frameIndex > 10000)
-            frameIndex = 0;
     }
     return 0;
 }
@@ -350,10 +364,15 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
     int width = detector.input_size[1];
     printf("config.thresh:%.2f\n", config->det_threshold);
     std::vector<BoxInfo> results;
-    int frameIndex = 0;
+    int frameIndex = -1;
     while (true)
     {
         cap >> image;
+
+        frameIndex++;
+        if (frameIndex > 10000)
+            frameIndex = 0;
+
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
@@ -364,12 +383,11 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
         } else
         {
             printf("this frame %d is skipped\n", frameIndex);
+            if (config->sync_results_frame)
+                continue;
         }
         draw_bboxes(image, results, effect_roi, "video");
         cv::waitKey(1);
-        frameIndex++;
-        if (frameIndex > 10000)
-            frameIndex = 0;
     }
     return 0;
 }
