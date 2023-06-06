@@ -2,7 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include <QDebug>
 #include <ncnn/include/net.h>
-#include "nanodet.h"
+#include <nanodet.h>
 #include <vector>
 #include <json.h>
 #include <iostream>
@@ -23,6 +23,7 @@ struct object_rect {
 
 struct DoorDet_config {
     float det_threshold;
+    int compute_every_frames;
 };
 
 bool parseConfig(const char* filename, DoorDet_config& config)
@@ -52,10 +53,13 @@ bool parseConfig(const char* filename, DoorDet_config& config)
     // start parsing
     float det_threshold = json_obj["det_threshold"].asFloat();
     config.det_threshold = det_threshold;
+    int compute_every_frames = json_obj["compute_every_frames"].asInt();
+    config.compute_every_frames = compute_every_frames;
 
     // check the configs
     printf("parsed Configs STARTED\n");
-    printf("det_threshold:%.2f\n", det_threshold);
+    printf("det_threshold:%.2f\n", config.det_threshold);
+    printf("compute_every_frames:%d\n", config.compute_every_frames);
     printf("parsed Configs ENDED\n");
 
     return true;
@@ -234,6 +238,8 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
     char* winName2 = new char[10]();
     sprintf(winName2, "WIN_%d", cam_id_2);
 
+    int64_t frameIndex;
+    std::vector<BoxInfo> results;
     while (true)
     {
         // the flag whether the abnormal status detected
@@ -243,8 +249,16 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image1, resized_img, cv::Size(width, height), effect_roi);
-        auto results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+        if (frameIndex % config->compute_every_frames == 0)
+        {
+            results.clear();
+            results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+        } else
+        {
+            printf("this frame %d is skipped\n", frameIndex);
+        }
         draw_bboxes(image1, results, effect_roi, winName1);
+
         for (auto box : results)
         {
             if (box.label > 0)
@@ -256,8 +270,16 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
 
         cap2 >> image2;
         resize_uniform(image2, resized_img, cv::Size(width, height), effect_roi);
-        results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+        if (frameIndex % config->compute_every_frames == 0)
+        {
+            results.clear();
+            results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+        } else
+        {
+            printf("this frame %d is skipped\n", frameIndex);
+        }
         draw_bboxes(image2, results, effect_roi, winName2);
+
         for (auto box : results)
         {
             if (box.label > 0)
@@ -272,6 +294,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
         {
             printf("WARNING: detected open door via the 2-ways-camera!!\n");
         }
+        frameIndex++;
     }
     return 0;
 }
@@ -285,22 +308,34 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
     int width = detector.input_size[1];
     if (!cap.isOpened())
     {
-        printf("failed to open camera %d", cam_id);
+        printf("failed to open camera %d\n", cam_id);
         return -1;
     }
 
     char* winName = new char[10]();
     sprintf(winName, "WIN_%d", cam_id);
 
+    std::vector<BoxInfo> results;
+    int frameIndex = 0;
     while (true)
     {
         cap >> image;
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
-        auto results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+
+        if (frameIndex % config->compute_every_frames == 0)
+        {
+            results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+        } else
+        {
+            printf("this frame %d is skipped\n", frameIndex);
+        }
         draw_bboxes(image, results, effect_roi, winName);
         cv::waitKey(1);
+        frameIndex++;
+        if (frameIndex > 10000)
+            frameIndex = 0;
     }
     return 0;
 }
@@ -314,15 +349,27 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
     int height = detector.input_size[0];
     int width = detector.input_size[1];
     printf("config.thresh:%.2f\n", config->det_threshold);
+    std::vector<BoxInfo> results;
+    int frameIndex = 0;
     while (true)
     {
         cap >> image;
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
-        auto results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+
+        if (frameIndex % config->compute_every_frames == 0)
+        {
+            results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+        } else
+        {
+            printf("this frame %d is skipped\n", frameIndex);
+        }
         draw_bboxes(image, results, effect_roi, "video");
         cv::waitKey(1);
+        frameIndex++;
+        if (frameIndex > 10000)
+            frameIndex = 0;
     }
     return 0;
 }
