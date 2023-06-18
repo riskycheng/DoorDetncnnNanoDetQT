@@ -81,7 +81,7 @@ void WriteFileJson(char* filePath, FusedResultInfo info, bool append)
     }
     else
     {
-        printf("successful: file write is success! \n");
+        printf("successful: log content updated! \n");
     }
 
     os << sw.write(root);
@@ -203,7 +203,6 @@ const int color_list[2][3] =
 
 void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id, bool savingLogs, char* logPath, char* timeStamp, bool append)
 {
-    printf("draw_bboxes started ! \n");
     static const char* class_names[] = {"box_close", "box_open"};
 
     cv::Mat image = bgr.clone();
@@ -217,6 +216,8 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
     bool anyDoorOpen = false;
 
     FusedResultInfo results;
+    results.camera_idx = camera_id;
+    results.timeStampStr = timeStamp;
 
     for (size_t i = 0; i < bboxes.size(); i++)
     {
@@ -293,7 +294,6 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
     // saving out results
     if (!savingLogs) return;
     // construct the log path
-    printf("the log path:%s \n", logPath);
     WriteFileJson(logPath, results, true);
 }
 
@@ -325,7 +325,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
 
     std::time_t result = std::time(nullptr);
     char* logPath = new char[100]();
-    sprintf(logPath, "./log_%s.txt", result);
+    sprintf(logPath, "./log_%d.txt", result);
 
     int64_t frameIndex = -1;
     std::vector<BoxInfo> results;
@@ -484,7 +484,7 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
         sprintf(timeStampStr, "%d", result);
 
         char* logPath = new char[100]();
-        sprintf(logPath, "./log_%s.txt", result);
+        sprintf(logPath, "./log_%d.txt", result);
 
         draw_bboxes(image, results, effect_roi, "video", 0, true, logPath, timeStampStr, true);
         cv::waitKey(1);
