@@ -354,9 +354,10 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
                 continue;
         }
 
-        result = std::time(nullptr);
+        uint64_t ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         char* timeStampStr = new char[20]();
-        sprintf(timeStampStr, "%d", result);
+        sprintf(timeStampStr, "%llu", ms);
+
         draw_bboxes(image1, results, effect_roi, winName1, cam_id_1, true, logPath, timeStampStr, true);
 
         for (auto box : results)
@@ -387,6 +388,8 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
                 isAnyDoorOpen = true;
             }
         }
+
+        delete[] timeStampStr;
         cv::waitKey(1);
 
         // the summarized info
@@ -395,6 +398,9 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
             printf("WARNING: detected open door via the 2-ways-camera!!\n");
         }
     }
+    delete[] winName1;
+    delete[] winName2;
+    delete[] logPath;
     return 0;
 }
 
@@ -438,11 +444,15 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
             if (config->sync_results_frame)
                 continue;
         }
+        uint64_t ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         char* timeStampStr = new char[20]();
-        sprintf(timeStampStr, "%d", result);
+        sprintf(timeStampStr, "%llu", ms);
         draw_bboxes(image, results, effect_roi, winName, cam_id, true, logPath, timeStampStr, true);
+        delete[] timeStampStr;
         cv::waitKey(1);
     }
+    delete[] winName;
+    delete[] logPath;
     return 0;
 }
 
@@ -454,6 +464,12 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
     cv::VideoCapture cap(path);
     int height = detector.input_size[0];
     int width = detector.input_size[1];
+
+    std::time_t result = std::time(nullptr);
+
+    char* logPath = new char[100]();
+    sprintf(logPath, "./log_%d.txt", result);
+
     printf("config.thresh:%.2f\n", config->det_threshold);
     std::vector<BoxInfo> results;
     int frameIndex = -1;
@@ -479,16 +495,15 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
                 continue;
         }
 
-        std::time_t result = std::time(nullptr);
+        uint64_t ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         char* timeStampStr = new char[20]();
-        sprintf(timeStampStr, "%d", result);
-
-        char* logPath = new char[100]();
-        sprintf(logPath, "./log_%d.txt", result);
+        sprintf(timeStampStr, "%llu", ms);
 
         draw_bboxes(image, results, effect_roi, "video", 0, true, logPath, timeStampStr, true);
+        delete[] timeStampStr;
         cv::waitKey(1);
     }
+       delete[] logPath;
     return 0;
 }
 
