@@ -27,6 +27,67 @@ struct DoorDet_config {
     bool sync_results_frame;
 };
 
+struct DoorDetResultInfo {
+    object_rect boundingBox;
+    int label; // 0 for close, 1 for open
+    float conf; // the detected confidence
+};
+
+struct FusedResultInfo {
+    std::vector<DoorDetResultInfo> doorInfoArray;
+    int camera_idx;
+    char* timeStampStr;
+};
+
+void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id = 0, bool savingLogs = true, char* logPath = nullptr, char* timeStamp = nullptr, bool append = false);
+//声明
+void WriteFileJson(char* filePath, FusedResultInfo info, bool append);
+
+//定义
+void WriteFileJson(char* filePath, FusedResultInfo info, bool append)
+{
+    Json::Value root;
+    root["camera_idx"] = Json::Value(info.camera_idx);
+    root["timeStampStr"] = Json::Value(info.timeStampStr);
+
+    //数组形式
+    for (auto& item : info.doorInfoArray)
+    {
+        Json::Value box;
+        box.append(item.boundingBox.x);
+        box.append(item.boundingBox.x);
+        box.append(item.boundingBox.width);
+        box.append(item.boundingBox.height);
+        box.append(item.label);
+        box.append(item.conf);
+        root["doors"].append(box);
+    }
+
+    /* 测试内容：会在屏幕输出 */
+    Json::StyledWriter sw;
+    //将内容输入到指定的文件
+    ofstream os;
+    if (append)
+    {
+        os.open(filePath, std::ios::app);
+    } else
+    {
+        os.open(filePath, std::ios::binary);
+    }
+
+    if(!os.is_open())
+    {
+        printf("Error: can not find or create the file which named : %s \n", filePath);
+    }
+    else
+    {
+        printf("successful: file write is success! \n");
+    }
+
+    os << sw.write(root);
+    os.close();
+}
+
 bool parseConfig(const char* filename, DoorDet_config& config)
 {
     std::ifstream ifs;
@@ -140,8 +201,9 @@ const int color_list[2][3] =
     {236 ,176 , 31}
 };
 
-void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName)
+void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id, bool savingLogs, char* logPath, char* timeStamp, bool append)
 {
+    printf("draw_bboxes started ! \n");
     static const char* class_names[] = {"box_close", "box_open"};
 
     cv::Mat image = bgr.clone();
@@ -154,6 +216,8 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
 
     bool anyDoorOpen = false;
 
+    FusedResultInfo results;
+
     for (size_t i = 0; i < bboxes.size(); i++)
     {
         const BoxInfo& bbox = bboxes[i];
@@ -165,9 +229,19 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
         cv::Scalar color = cv::Scalar(color_list[bbox.label][0], color_list[bbox.label][1], color_list[bbox.label][2]);
         //fprintf(stderr, "%d = %.5f at %.2f %.2f %.2f %.2f\n", bbox.label, bbox.score,
         //    bbox.x1, bbox.y1, bbox.x2, bbox.y2);
+        auto obj_rect = cv::Rect(cv::Point((bbox.x1 - effect_roi.x) * width_ratio, (bbox.y1 - effect_roi.y) * height_ratio),
+                                 cv::Point((bbox.x2 - effect_roi.x) * width_ratio, (bbox.y2 - effect_roi.y) * height_ratio));
+        cv::rectangle(image, obj_rect, color);
 
-        cv::rectangle(image, cv::Rect(cv::Point((bbox.x1 - effect_roi.x) * width_ratio, (bbox.y1 - effect_roi.y) * height_ratio),
-                                      cv::Point((bbox.x2 - effect_roi.x) * width_ratio, (bbox.y2 - effect_roi.y) * height_ratio)), color);
+        // put it to the fused structure
+        DoorDetResultInfo doorInfo;
+        doorInfo.label = bbox.label;
+        doorInfo.conf = bbox.score;
+        doorInfo.boundingBox.x = obj_rect.x;
+        doorInfo.boundingBox.y = obj_rect.y;
+        doorInfo.boundingBox.width = obj_rect.width;
+        doorInfo.boundingBox.height = obj_rect.height;
+        results.doorInfoArray.push_back(doorInfo);
 
         char text[256];
         sprintf(text, "%s %.1f%%", class_names[bbox.label], bbox.score * 100);
@@ -215,6 +289,12 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
     }
 
     cv::imshow(winName, cv::InputArray(image));
+
+    // saving out results
+    if (!savingLogs) return;
+    // construct the log path
+    printf("the log path:%s \n", logPath);
+    WriteFileJson(logPath, results, true);
 }
 
 
@@ -243,6 +323,10 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
     char* winName2 = new char[10]();
     sprintf(winName2, "WIN_%d", cam_id_2);
 
+    std::time_t result = std::time(nullptr);
+    char* logPath = new char[100]();
+    sprintf(logPath, "./log_%s.txt", result);
+
     int64_t frameIndex = -1;
     std::vector<BoxInfo> results;
     while (true)
@@ -269,7 +353,11 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
             if (config->sync_results_frame)
                 continue;
         }
-        draw_bboxes(image1, results, effect_roi, winName1);
+
+        result = std::time(nullptr);
+        char* timeStampStr = new char[20]();
+        sprintf(timeStampStr, "%d", result);
+        draw_bboxes(image1, results, effect_roi, winName1, cam_id_1, true, logPath, timeStampStr, true);
 
         for (auto box : results)
         {
@@ -290,7 +378,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
         {
             printf("this frame %d is skipped\n", frameIndex);
         }
-        draw_bboxes(image2, results, effect_roi, winName2);
+        draw_bboxes(image2, results, effect_roi, winName2, cam_id_2, true, logPath, timeStampStr, true);
 
         for (auto box : results)
         {
@@ -322,7 +410,9 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
         printf("failed to open camera %d\n", cam_id);
         return -1;
     }
-
+    std::time_t result = std::time(nullptr);
+    char* logPath = new char[100]();
+    sprintf(logPath, "./log_%d.txt", result);
     char* winName = new char[10]();
     sprintf(winName, "WIN_%d", cam_id);
 
@@ -348,7 +438,9 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
             if (config->sync_results_frame)
                 continue;
         }
-        draw_bboxes(image, results, effect_roi, winName);
+        char* timeStampStr = new char[20]();
+        sprintf(timeStampStr, "%d", result);
+        draw_bboxes(image, results, effect_roi, winName, cam_id, true, logPath, timeStampStr, true);
         cv::waitKey(1);
     }
     return 0;
@@ -386,7 +478,15 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
             if (config->sync_results_frame)
                 continue;
         }
-        draw_bboxes(image, results, effect_roi, "video");
+
+        std::time_t result = std::time(nullptr);
+        char* timeStampStr = new char[20]();
+        sprintf(timeStampStr, "%d", result);
+
+        char* logPath = new char[100]();
+        sprintf(logPath, "./log_%s.txt", result);
+
+        draw_bboxes(image, results, effect_roi, "video", 0, true, logPath, timeStampStr, true);
         cv::waitKey(1);
     }
     return 0;
@@ -462,7 +562,7 @@ int main_()
         printf("warning : config parsing failed! \n");
     }
 
-    webcam_demo(detector, &config, 3);
+    webcam_demo(detector, &config, 0);
 
     //video_demo(detector, "/home/teamhd/Downloads/video_09_02_230317_nightOpen_reserved_TEST.mp4");
     return 0;
