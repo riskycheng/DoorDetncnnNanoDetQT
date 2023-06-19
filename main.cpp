@@ -121,6 +121,16 @@ void writeToSharedMemory(string content)
     semop(M_SHARED_SEM_ID, &sops, 1);
 }
 
+void releaseSharedMemory() {
+    shmdt(M_MESSAGE_ID);
+
+    // 删除共享内存
+    shmctl(M_SHARED_MEMORY_ID, IPC_RMID, nullptr);
+
+    // 删除信号量
+    semctl(M_SHARED_SEM_ID, 0, IPC_RMID);
+}
+
 void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id = 0, bool savingLogs = true, char* logPath = nullptr, char* timeStamp = nullptr, bool append = false);
 //声明
 string WriteFileJson(char* filePath, FusedResultInfo info, bool append);
@@ -648,6 +658,8 @@ int main_(int argc, char** argv)
          break;
      }
    }
+
+   releaseSharedMemory();
    return 0;
 }
 
@@ -674,6 +686,8 @@ int main()
     webcam_demo(detector, &config, 0);
 
     //video_demo(detector, "/home/teamhd/Downloads/video_09_02_230317_nightOpen_reserved_TEST.mp4");
+
+    releaseSharedMemory();
     return 0;
 }
 
