@@ -59,6 +59,7 @@ struct FusedResultInfo {
 
 bool initSharedMemory(DoorDet_config config)
 {
+    printf("creating sharedMemory at ID:%d \n", config.sharedMemID);
     bool resultCode = true;
     M_SHARED_MEMORY_ID = shmget(config.sharedMemID, sizeof(Message), IPC_CREAT | 0666);
     if (M_SHARED_MEMORY_ID == -1)
@@ -100,14 +101,12 @@ bool initSharedMemory(DoorDet_config config)
 
 void writeToSharedMemory(string content, DoorDet_config config)
 {
-    printf("write %s into shared memory! \n", content.c_str());
     // 获取信号量的当前值
     struct sembuf sops;
     sops.sem_num = 0;
     sops.sem_op = 0;
     sops.sem_flg = 0;
-    if (config.sync_waiting_sharedMemory_consumed)
-        semop(M_SHARED_SEM_ID, &sops, 1);
+    semop(M_SHARED_SEM_ID, &sops, 1);
 
     // 写入消息到共享内存
     strncpy(M_MESSAGE_ID->content, content.c_str(), sizeof(M_MESSAGE_ID->content));
@@ -115,8 +114,7 @@ void writeToSharedMemory(string content, DoorDet_config config)
 
     // 释放信号量
     sops.sem_op = 1;
-    if (config.sync_waiting_sharedMemory_consumed)
-        semop(M_SHARED_SEM_ID, &sops, 1);
+    semop(M_SHARED_SEM_ID, &sops, 1);
 }
 
 void releaseSharedMemory() {
@@ -168,10 +166,6 @@ string WriteFileJson(char* filePath, FusedResultInfo info, bool append)
     if(!os.is_open())
     {
         printf("Error: can not find or create the file which named : %s \n", filePath);
-    }
-    else
-    {
-        printf("successful: log content updated! \n");
     }
 
     os << sw.write(root);
@@ -453,7 +447,6 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
             results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         } else
         {
-            printf("this frame %d is skipped\n", frameIndex);
             if (config.sync_results_frame)
                 continue;
         }
@@ -479,10 +472,8 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
         {
             results.clear();
             results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
-        } else
-        {
-            printf("this frame %d is skipped\n", frameIndex);
         }
+
         draw_bboxes(image2, config, results, effect_roi, winName2, cam_id_2, true, logPath, timeStampStr, true);
 
         for (auto box : results)
@@ -544,7 +535,6 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id)
             results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         } else
         {
-            printf("this frame %d is skipped\n", frameIndex);
             if (config.sync_results_frame)
                 continue;
         }
@@ -594,7 +584,6 @@ int video_demo(NanoDet& detector, const DoorDet_config config, const char* path)
             results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         } else
         {
-            printf("this frame %d is skipped\n", frameIndex);
             if (config.sync_results_frame)
                 continue;
         }
