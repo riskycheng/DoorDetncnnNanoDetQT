@@ -106,7 +106,8 @@ void writeToSharedMemory(string content, DoorDet_config config)
     sops.sem_num = 0;
     sops.sem_op = 0;
     sops.sem_flg = 0;
-    semop(M_SHARED_SEM_ID, &sops, 1);
+    if(config.sync_waiting_sharedMemory_consumed)
+        semop(M_SHARED_SEM_ID, &sops, 1);
 
     // 写入消息到共享内存
     strncpy(M_MESSAGE_ID->content, content.c_str(), sizeof(M_MESSAGE_ID->content));
