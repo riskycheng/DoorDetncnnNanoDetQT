@@ -7,11 +7,32 @@
 #include <json.h>
 #include <iostream>
 #include <fstream>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <cstdlib>
+#include <cstring>
 
 using namespace std;
 using namespace Json;
 using namespace cv;
 #define NMS_THRESHOLD 0.5F
+
+// add the sharedMemory
+// 共享内存的键值
+#define SHM_KEY 1243
+
+// 信号量的键值
+#define SEM_KEY 5687
+
+// 结构体，用于在共享内存中存储消息
+struct Message {
+    bool isWritten;
+    char content[1024 * 10];
+};
+
+int M_SHARED_MEMORY_ID;
+int M_SHARED_SEM_ID;
+Message * M_MESSAGE_ID;
 
 struct object_rect {
     int x;
@@ -39,12 +60,59 @@ struct FusedResultInfo {
     char* timeStampStr;
 };
 
+
+bool initSharedMemory()
+{
+    bool resultCode = true;
+    M_SHARED_MEMORY_ID = shmget(SHM_KEY, sizeof(Message), IPC_CREAT | 0666);
+    if (M_SHARED_MEMORY_ID == -1)
+    {
+        printf("error: failed to create shared memory! \n");
+        resultCode = false;
+    }
+
+    // connect to the shared memory
+    M_MESSAGE_ID = (Message *)shmat(M_SHARED_MEMORY_ID, nullptr, 0);
+    if (M_MESSAGE_ID == (Message *) -1)
+    {
+        printf("error: failed to attach the shared memory! \n");
+        resultCode = false;
+    }
+
+    // create the shared sem
+    M_SHARED_SEM_ID = semget(SEM_KEY, 1, IPC_CREAT | 0666);
+    if (M_SHARED_SEM_ID == -1)
+    {
+        printf("error: failed to create semaphore! \n");
+        resultCode = false;
+    }
+
+    // init the semaphore
+    semctl(M_SHARED_SEM_ID, 0, SETVAL, 0);
+
+    // started the sharedMemory processing
+    if (resultCode)
+    {
+        printf("Congrat: the shared memory stuff prepared successfully! \n");
+    } else
+    {
+        printf("ERROR: the shared memory stuff preparation failed! \n");
+    }
+
+    return resultCode;
+}
+
+void writeToSharedMemory(string content)
+{
+
+}
+
 void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id = 0, bool savingLogs = true, char* logPath = nullptr, char* timeStamp = nullptr, bool append = false);
 //声明
-void WriteFileJson(char* filePath, FusedResultInfo info, bool append);
+string WriteFileJson(char* filePath, FusedResultInfo info, bool append);
 
 //定义
-void WriteFileJson(char* filePath, FusedResultInfo info, bool append)
+string WriteFileJson(char* filePath, FusedResultInfo info, bool append)
 {
     Json::Value root;
     root["camera_idx"] = Json::Value(info.camera_idx);
@@ -85,7 +153,11 @@ void WriteFileJson(char* filePath, FusedResultInfo info, bool append)
     }
 
     os << sw.write(root);
+
+    // write to string
+    string dataStr = root.toStyledString();
     os.close();
+    return dataStr;
 }
 
 bool parseConfig(const char* filename, DoorDet_config& config)
@@ -508,7 +580,7 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
 }
 
 
-int main(int argc, char** argv)
+int main_(int argc, char** argv)
 {
    if (argc != 3 && argc != 4)
    {
@@ -528,6 +600,8 @@ int main(int argc, char** argv)
    {
        printf("warning : config parsing failed! \n");
    }
+
+   initSharedMemory();
 
    switch (mode)
    {
@@ -563,7 +637,10 @@ int main(int argc, char** argv)
 }
 
 
-int main_()
+
+
+
+int main()
 {
     NanoDet detector = NanoDet("/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.param", "/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.bin", true);
 
@@ -576,6 +653,8 @@ int main_()
     {
         printf("warning : config parsing failed! \n");
     }
+
+    initSharedMemory();
 
     webcam_demo(detector, &config, 0);
 
