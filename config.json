@@ -3,6 +3,12 @@
 "det_threshold": 0.5,
 "?compute_every_frames": "compute the detection every N frames, indicates that N-1 frames will be skipped",
 "compute_every_frames": 30,
-"?sync_results_frame": "if true, the frame won't be updated until the corresponding result computed, latency might be observed; if false, the results computed from previous frames will be inherit to this frame, misalignments might be observed for fast movements",
-"sync_results_frame": false
+"?sync_results_frame": "if true, the frame won't be updated until detection done, latency might be observed; if false, previous result applied, misalignments might be observed for fast movements",
+"sync_results_frame": false,
+"?shared_memory_key": "the ID for the shared memory address",
+"shared_memory_key": 1243,
+"?shared_sem_key": "the ID for the shared semphore for the synchronized write/read between applications",
+"shared_sem_key": 5687,
+"?sync_waiting_sharedMemory_consumed": "the application will wait infinitely if true until the shared memory data consumed",
+"sync_waiting_sharedMemory_consumed": true
 }

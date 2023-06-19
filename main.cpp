@@ -17,13 +17,6 @@ using namespace Json;
 using namespace cv;
 #define NMS_THRESHOLD 0.5F
 
-// add the sharedMemory
-// 共享内存的键值
-#define SHM_KEY 1243
-
-// 信号量的键值
-#define SEM_KEY 5687
-
 // 结构体，用于在共享内存中存储消息
 struct Message {
     bool isWritten;
@@ -46,6 +39,9 @@ struct DoorDet_config {
     float det_threshold;
     int compute_every_frames;
     bool sync_results_frame;
+    int sharedMemID;
+    int sharedSemID;
+    bool sync_waiting_sharedMemory_consumed;
 };
 
 struct DoorDetResultInfo {
@@ -61,10 +57,10 @@ struct FusedResultInfo {
 };
 
 
-bool initSharedMemory()
+bool initSharedMemory(DoorDet_config config)
 {
     bool resultCode = true;
-    M_SHARED_MEMORY_ID = shmget(SHM_KEY, sizeof(Message), IPC_CREAT | 0666);
+    M_SHARED_MEMORY_ID = shmget(config.sharedMemID, sizeof(Message), IPC_CREAT | 0666);
     if (M_SHARED_MEMORY_ID == -1)
     {
         printf("error: failed to create shared memory! \n");
@@ -80,7 +76,7 @@ bool initSharedMemory()
     }
 
     // create the shared sem
-    M_SHARED_SEM_ID = semget(SEM_KEY, 1, IPC_CREAT | 0666);
+    M_SHARED_SEM_ID = semget(config.sharedSemID, 1, IPC_CREAT | 0666);
     if (M_SHARED_SEM_ID == -1)
     {
         printf("error: failed to create semaphore! \n");
@@ -215,6 +211,12 @@ bool parseConfig(const char* filename, DoorDet_config& config)
     config.compute_every_frames = compute_every_frames;
     bool sync_results_frame = json_obj["sync_results_frame"].asBool();
     config.sync_results_frame = sync_results_frame;
+    int shared_memory_key = json_obj["shared_memory_key"].asInt();
+    config.sharedMemID = shared_memory_key;
+    int shared_sem_key = json_obj["shared_sem_key"].asInt();
+    config.sharedSemID = shared_sem_key;
+    bool sync_waiting_sharedMemory_consumed = json_obj["sync_waiting_sharedMemory_consumed"].asBool();
+    config.sync_waiting_sharedMemory_consumed = sync_waiting_sharedMemory_consumed;
 
 
     // check the configs
@@ -222,6 +224,9 @@ bool parseConfig(const char* filename, DoorDet_config& config)
     printf("det_threshold:%.2f\n", config.det_threshold);
     printf("compute_every_frames:%d\n", config.compute_every_frames);
     printf("sync_results_frame:%s\n", config.sync_results_frame ? "true" : "false");
+    printf("sharedMemID:%d\n", config.sharedMemID);
+    printf("sharedSemID:%d\n", config.sharedSemID);
+    printf("sync_waiting_sharedMemory_consumed:%s\n", config.sync_waiting_sharedMemory_consumed ? "true" : "false");
     printf("parsed Configs ENDED\n");
 
     return true;
@@ -626,7 +631,7 @@ int main_(int argc, char** argv)
        printf("warning : config parsing failed! \n");
    }
 
-   initSharedMemory();
+   initSharedMemory(config);
 
    switch (mode)
    {
@@ -681,7 +686,7 @@ int main()
         printf("warning : config parsing failed! \n");
     }
 
-    initSharedMemory();
+    initSharedMemory(config);
 
     webcam_demo(detector, &config, 0);
 
