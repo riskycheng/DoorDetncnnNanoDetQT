@@ -98,7 +98,7 @@ bool initSharedMemory(DoorDet_config config)
     return resultCode;
 }
 
-void writeToSharedMemory(string content)
+void writeToSharedMemory(string content, DoorDet_config config)
 {
     printf("write %s into shared memory! \n", content.c_str());
     // 获取信号量的当前值
@@ -106,7 +106,8 @@ void writeToSharedMemory(string content)
     sops.sem_num = 0;
     sops.sem_op = 0;
     sops.sem_flg = 0;
-    semop(M_SHARED_SEM_ID, &sops, 1);
+    if (config.sync_waiting_sharedMemory_consumed)
+        semop(M_SHARED_SEM_ID, &sops, 1);
 
     // 写入消息到共享内存
     strncpy(M_MESSAGE_ID->content, content.c_str(), sizeof(M_MESSAGE_ID->content));
@@ -114,7 +115,8 @@ void writeToSharedMemory(string content)
 
     // 释放信号量
     sops.sem_op = 1;
-    semop(M_SHARED_SEM_ID, &sops, 1);
+    if (config.sync_waiting_sharedMemory_consumed)
+        semop(M_SHARED_SEM_ID, &sops, 1);
 }
 
 void releaseSharedMemory() {
@@ -127,7 +129,7 @@ void releaseSharedMemory() {
     semctl(M_SHARED_SEM_ID, 0, IPC_RMID);
 }
 
-void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id = 0, bool savingLogs = true, char* logPath = nullptr, char* timeStamp = nullptr, bool append = false);
+void draw_bboxes(const cv::Mat& bgr, DoorDet_config config, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id = 0, bool savingLogs = true, char* logPath = nullptr, char* timeStamp = nullptr, bool append = false);
 //声明
 string WriteFileJson(char* filePath, FusedResultInfo info, bool append);
 
@@ -302,7 +304,7 @@ const int color_list[2][3] =
     {236 ,176 , 31}
 };
 
-void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id, bool savingLogs, char* logPath, char* timeStamp, bool append)
+void draw_bboxes(const cv::Mat& bgr, DoorDet_config config, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id, bool savingLogs, char* logPath, char* timeStamp, bool append)
 {
     static const char* class_names[] = {"box_close", "box_open"};
 
@@ -396,12 +398,12 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
     if (!savingLogs) return;
     // construct the log path
     string result = WriteFileJson(logPath, results, true);
-    writeToSharedMemory(result);
+    writeToSharedMemory(result, config);
 }
 
 
 // dual cameras mode
-int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam_id_2)
+int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_id_2)
 {
     cv::Mat image1, image2;
     cv::VideoCapture cap1(cam_id_1), cap2(cam_id_2);
@@ -445,14 +447,14 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
         object_rect effect_roi;
         cv::Mat resized_img;
         resize_uniform(image1, resized_img, cv::Size(width, height), effect_roi);
-        if (frameIndex % config->compute_every_frames == 0)
+        if (frameIndex % config.compute_every_frames == 0)
         {
             results.clear();
-            results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+            results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         } else
         {
             printf("this frame %d is skipped\n", frameIndex);
-            if (config->sync_results_frame)
+            if (config.sync_results_frame)
                 continue;
         }
 
@@ -460,7 +462,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
         char* timeStampStr = new char[20]();
         sprintf(timeStampStr, "%llu", ms);
 
-        draw_bboxes(image1, results, effect_roi, winName1, cam_id_1, true, logPath, timeStampStr, true);
+        draw_bboxes(image1, config, results, effect_roi, winName1, cam_id_1, true, logPath, timeStampStr, true);
 
         for (auto box : results)
         {
@@ -473,15 +475,15 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
 
         cap2 >> image2;
         resize_uniform(image2, resized_img, cv::Size(width, height), effect_roi);
-        if (frameIndex % config->compute_every_frames == 0)
+        if (frameIndex % config.compute_every_frames == 0)
         {
             results.clear();
-            results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+            results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         } else
         {
             printf("this frame %d is skipped\n", frameIndex);
         }
-        draw_bboxes(image2, results, effect_roi, winName2, cam_id_2, true, logPath, timeStampStr, true);
+        draw_bboxes(image2, config, results, effect_roi, winName2, cam_id_2, true, logPath, timeStampStr, true);
 
         for (auto box : results)
         {
@@ -507,7 +509,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id_1, int cam
 }
 
 // single camera mode
-int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
+int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id)
 {
     cv::Mat image;
     cv::VideoCapture cap(cam_id);
@@ -536,20 +538,20 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
 
-        if (frameIndex % config->compute_every_frames == 0 || frameIndex < 0)
+        if (frameIndex % config.compute_every_frames == 0 || frameIndex < 0)
         {
             printf("this frame %d is computed\n", frameIndex);
-            results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+            results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         } else
         {
             printf("this frame %d is skipped\n", frameIndex);
-            if (config->sync_results_frame)
+            if (config.sync_results_frame)
                 continue;
         }
         uint64_t ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         char* timeStampStr = new char[20]();
         sprintf(timeStampStr, "%llu", ms);
-        draw_bboxes(image, results, effect_roi, winName, cam_id, true, logPath, timeStampStr, true);
+        draw_bboxes(image, config, results, effect_roi, winName, cam_id, true, logPath, timeStampStr, true);
         delete[] timeStampStr;
         cv::waitKey(1);
     }
@@ -560,7 +562,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config* config, int cam_id)
 
 
 
-int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path)
+int video_demo(NanoDet& detector, const DoorDet_config config, const char* path)
 {
     cv::Mat image;
     cv::VideoCapture cap(path);
@@ -572,7 +574,7 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
     char* logPath = new char[100]();
     sprintf(logPath, "./log_%d.txt", result);
 
-    printf("config.thresh:%.2f\n", config->det_threshold);
+    printf("config.thresh:%.2f\n", config.det_threshold);
     std::vector<BoxInfo> results;
     int frameIndex = -1;
     while (true)
@@ -587,13 +589,13 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
         cv::Mat resized_img;
         resize_uniform(image, resized_img, cv::Size(width, height), effect_roi);
 
-        if (frameIndex % config->compute_every_frames == 0)
+        if (frameIndex % config.compute_every_frames == 0)
         {
-            results = detector.detect(resized_img, config->det_threshold, NMS_THRESHOLD);
+            results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         } else
         {
             printf("this frame %d is skipped\n", frameIndex);
-            if (config->sync_results_frame)
+            if (config.sync_results_frame)
                 continue;
         }
 
@@ -601,7 +603,7 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
         char* timeStampStr = new char[20]();
         sprintf(timeStampStr, "%llu", ms);
 
-        draw_bboxes(image, results, effect_roi, "video", 0, true, logPath, timeStampStr, true);
+        draw_bboxes(image, config, results, effect_roi, "video", 0, true, logPath, timeStampStr, true);
         delete[] timeStampStr;
         cv::waitKey(1);
     }
@@ -610,7 +612,7 @@ int video_demo(NanoDet& detector, const DoorDet_config* config, const char* path
 }
 
 
-int main_(int argc, char** argv)
+int main(int argc, char** argv)
 {
    if (argc != 3 && argc != 4)
    {
@@ -640,12 +642,12 @@ int main_(int argc, char** argv)
         if (argc == 3)
         {
           int cam_id = atoi(argv[2]);
-          webcam_demo(detector, &config, cam_id);
+          webcam_demo(detector, config, cam_id);
         } else if (argc == 4)
         {
            int cam_id_1 = atoi(argv[2]);
            int cam_id_2 = atoi(argv[3]);
-           webcam_demo(detector, &config, cam_id_1, cam_id_2);
+           webcam_demo(detector, config, cam_id_1, cam_id_2);
         }
         break;
      }
@@ -653,7 +655,7 @@ int main_(int argc, char** argv)
      case 1:
      {
         const char* path = argv[2];
-        video_demo(detector, &config, path);
+        video_demo(detector, config, path);
         break;
      }
 
@@ -672,7 +674,7 @@ int main_(int argc, char** argv)
 
 
 
-int main()
+int main_()
 {
     NanoDet detector = NanoDet("/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.param", "/home/teamhd/opencvTest_QT/ncnn_models/nanodet_door.bin", true);
 
@@ -688,7 +690,7 @@ int main()
 
     initSharedMemory(config);
 
-    webcam_demo(detector, &config, 0);
+    webcam_demo(detector, config, 0);
 
     //video_demo(detector, "/home/teamhd/Downloads/video_09_02_230317_nightOpen_reserved_TEST.mp4");
 
