@@ -104,7 +104,21 @@ bool initSharedMemory()
 
 void writeToSharedMemory(string content)
 {
+    printf("write %s into shared memory! \n", content.c_str());
+    // 获取信号量的当前值
+    struct sembuf sops;
+    sops.sem_num = 0;
+    sops.sem_op = 0;
+    sops.sem_flg = 0;
+    semop(M_SHARED_SEM_ID, &sops, 1);
 
+    // 写入消息到共享内存
+    strncpy(M_MESSAGE_ID->content, content.c_str(), sizeof(M_MESSAGE_ID->content));
+    M_MESSAGE_ID->isWritten = true;
+
+    // 释放信号量
+    sops.sem_op = 1;
+    semop(M_SHARED_SEM_ID, &sops, 1);
 }
 
 void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id = 0, bool savingLogs = true, char* logPath = nullptr, char* timeStamp = nullptr, bool append = false);
@@ -366,7 +380,8 @@ void draw_bboxes(const cv::Mat& bgr, const std::vector<BoxInfo>& bboxes, object_
     // saving out results
     if (!savingLogs) return;
     // construct the log path
-    WriteFileJson(logPath, results, true);
+    string result = WriteFileJson(logPath, results, true);
+    writeToSharedMemory(result);
 }
 
 
