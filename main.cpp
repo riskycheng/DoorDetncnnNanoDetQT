@@ -53,7 +53,7 @@ struct DoorDetResultInfo {
 struct FusedResultInfo {
     std::vector<DoorDetResultInfo> doorInfoArray;
     int camera_idx;
-    char* timeStampStr;
+    uint64_t timeStamp;
 };
 
 
@@ -128,7 +128,7 @@ void releaseSharedMemory() {
     semctl(M_SHARED_SEM_ID, 0, IPC_RMID);
 }
 
-void draw_bboxes(const cv::Mat& bgr, DoorDet_config config, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id = 0, bool savingLogs = true, char* logPath = nullptr, char* timeStamp = nullptr, bool append = false);
+void draw_bboxes(const cv::Mat& bgr, DoorDet_config config, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id = 0, bool savingLogs = true, char* logPath = nullptr, uint64_t timeStamp = 0, bool append = false);
 //声明
 string WriteFileJson(char* filePath, FusedResultInfo info, bool append);
 
@@ -137,7 +137,7 @@ string WriteFileJson(char* filePath, FusedResultInfo info, bool append)
 {
     Json::Value root;
     root["camera_idx"] = Json::Value(info.camera_idx);
-    root["timeStampStr"] = Json::Value(info.timeStampStr);
+    root["timeStamp"] = Json::Value(info.timeStamp);
 
     //数组形式
     for (auto& item : info.doorInfoArray)
@@ -299,7 +299,7 @@ const int color_list[2][3] =
     {236 ,176 , 31}
 };
 
-void draw_bboxes(const cv::Mat& bgr, DoorDet_config config, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id, bool savingLogs, char* logPath, char* timeStamp, bool append)
+void draw_bboxes(const cv::Mat& bgr, DoorDet_config config, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id, bool savingLogs, char* logPath, uint64_t timeStamp, bool append)
 {
     static const char* class_names[] = {"box_close", "box_open"};
 
@@ -315,7 +315,7 @@ void draw_bboxes(const cv::Mat& bgr, DoorDet_config config, const std::vector<Bo
 
     FusedResultInfo results;
     results.camera_idx = camera_id;
-    results.timeStampStr = timeStamp;
+    results.timeStamp = timeStamp;
 
     for (size_t i = 0; i < bboxes.size(); i++)
     {
@@ -452,11 +452,9 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
                 continue;
         }
 
-        uint64_t ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        char* timeStampStr = new char[20]();
-        sprintf(timeStampStr, "%llu", ms);
+        uint64_t timeStamp_ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-        draw_bboxes(image1, config, results, effect_roi, winName1, cam_id_1, true, logPath, timeStampStr, true);
+        draw_bboxes(image1, config, results, effect_roi, winName1, cam_id_1, true, logPath, timeStamp_ms, true);
 
         for (auto box : results)
         {
@@ -475,7 +473,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
             results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         }
 
-        draw_bboxes(image2, config, results, effect_roi, winName2, cam_id_2, true, logPath, timeStampStr, true);
+        draw_bboxes(image2, config, results, effect_roi, winName2, cam_id_2, true, logPath, timeStamp_ms, true);
 
         for (auto box : results)
         {
@@ -485,7 +483,6 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
             }
         }
 
-        delete[] timeStampStr;
         cv::waitKey(1);
 
         // the summarized info
@@ -539,11 +536,8 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id)
             if (config.sync_results_frame)
                 continue;
         }
-        uint64_t ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        char* timeStampStr = new char[20]();
-        sprintf(timeStampStr, "%llu", ms);
-        draw_bboxes(image, config, results, effect_roi, winName, cam_id, true, logPath, timeStampStr, true);
-        delete[] timeStampStr;
+        uint64_t timeStamp_ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        draw_bboxes(image, config, results, effect_roi, winName, cam_id, true, logPath, timeStamp_ms, true);
         cv::waitKey(1);
     }
     delete[] winName;
@@ -589,12 +583,9 @@ int video_demo(NanoDet& detector, const DoorDet_config config, const char* path)
                 continue;
         }
 
-        uint64_t ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        char* timeStampStr = new char[20]();
-        sprintf(timeStampStr, "%llu", ms);
+        uint64_t timeStamp_ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-        draw_bboxes(image, config, results, effect_roi, "video", 0, true, logPath, timeStampStr, true);
-        delete[] timeStampStr;
+        draw_bboxes(image, config, results, effect_roi, "video", 0, true, logPath, timeStamp_ms, true);
         cv::waitKey(1);
     }
        delete[] logPath;
