@@ -143,12 +143,12 @@ string WriteFileJson(char* filePath, FusedResultInfo info, bool append)
     for (auto& item : info.doorInfoArray)
     {
         Json::Value box;
-        box.append(item.boundingBox.x);
-        box.append(item.boundingBox.x);
-        box.append(item.boundingBox.width);
-        box.append(item.boundingBox.height);
-        box.append(item.label);
-        box.append(item.conf);
+        box["x"] = Json::Value(item.boundingBox.x);
+        box["y"] = Json::Value(item.boundingBox.y);
+        box["width"] = Json::Value(item.boundingBox.width);
+        box["height"] = Json::Value(item.boundingBox.height);
+        box["status"] = Json::Value(item.label);
+        box["conf"] = Json::Value(item.conf);
         root["doors"].append(box);
     }
 
