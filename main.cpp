@@ -139,6 +139,7 @@ string WriteFileJson(char* filePath, FusedResultInfo info, bool append)
     root["camera_idx"] = Json::Value(info.camera_idx);
     root["timeStamp"] = Json::Value(info.timeStamp);
 
+    bool anyDoorOpen = false;
     //数组形式
     for (auto& item : info.doorInfoArray)
     {
@@ -148,9 +149,14 @@ string WriteFileJson(char* filePath, FusedResultInfo info, bool append)
         box["width"] = Json::Value(item.boundingBox.width);
         box["height"] = Json::Value(item.boundingBox.height);
         box["status"] = Json::Value(item.label);
-        box["conf"] = Json::Value(item.conf);
+        box["confidence"] = Json::Value(item.conf);
         root["doors"].append(box);
+        if (item.label > 0)
+            anyDoorOpen = true;
     }
+
+    // write out
+    root["anyDoorOpen"] = Json::Value(anyDoorOpen);
 
     /* 测试内容：会在屏幕输出 */
     Json::StyledWriter sw;
