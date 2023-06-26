@@ -38,7 +38,12 @@ INCLUDEPATH += /usr/local/include/ \
                /usr/local/include/opencv2 \
                /usr/local/include/ncnn/include
 
-LIBS += /usr/local/lib/lib* \
+LIBS += /usr/local/lib/libopencv_highgui.so \
+        /usr/local/lib/libopencv_imgproc.so \
+        /usr/local/lib/libopencv_core.so \
+        /usr/local/lib/libopencv_imgcodecs.so \
+        /usr/local/lib/libopencv_video.so \
+        /usr/local/lib/libopencv_videoio.so \
         /usr/local/lib/libncnn.a \
 
 # Default rules for deployment.

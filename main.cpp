@@ -141,6 +141,7 @@ string WriteFileJson(char* filePath, FusedResultInfo info, bool append)
 
     bool anyDoorOpen = false;
     //数组形式
+    root["doors"] = Json::arrayValue;
     for (auto& item : info.doorInfoArray)
     {
         Json::Value box;
