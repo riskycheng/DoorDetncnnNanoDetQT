@@ -303,7 +303,7 @@ int resize_uniform(cv::Mat& src, cv::Mat& dst, cv::Size dst_size, object_rect& e
 const int color_list[2][3] =
 {
     {216 , 82 , 24},
-    {236 ,176 , 31}
+    {0 ,0 , 255}
 };
 
 void draw_bboxes(const cv::Mat& bgr, DoorDet_config config, const std::vector<BoxInfo>& bboxes, object_rect effect_roi, char* winName, int camera_id, bool savingLogs, char* logPath, uint64_t timeStamp, bool append)
@@ -434,7 +434,7 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
     sprintf(logPath, "./log_%d.txt", result);
 
     int64_t frameIndex = -1;
-    std::vector<BoxInfo> results;
+    std::vector<BoxInfo> results_cam1, results_cam2;
     while (true)
     {
         // the flag whether the abnormal status detected
@@ -451,8 +451,8 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
         resize_uniform(image1, resized_img, cv::Size(width, height), effect_roi);
         if (frameIndex % config.compute_every_frames == 0)
         {
-            results.clear();
-            results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
+            results_cam1.clear();
+            results_cam1 = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         } else
         {
             if (config.sync_results_frame)
@@ -461,9 +461,9 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
 
         uint64_t timeStamp_ms = duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-        draw_bboxes(image1, config, results, effect_roi, winName1, cam_id_1, true, logPath, timeStamp_ms, true);
+        draw_bboxes(image1, config, results_cam1, effect_roi, winName1, cam_id_1, true, logPath, timeStamp_ms, true);
 
-        for (auto box : results)
+        for (auto box : results_cam1)
         {
             if (box.label > 0)
             {
@@ -476,13 +476,13 @@ int webcam_demo(NanoDet& detector, DoorDet_config config, int cam_id_1, int cam_
         resize_uniform(image2, resized_img, cv::Size(width, height), effect_roi);
         if (frameIndex % config.compute_every_frames == 0)
         {
-            results.clear();
-            results = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
+            results_cam2.clear();
+            results_cam2 = detector.detect(resized_img, config.det_threshold, NMS_THRESHOLD);
         }
 
-        draw_bboxes(image2, config, results, effect_roi, winName2, cam_id_2, true, logPath, timeStamp_ms, true);
+        draw_bboxes(image2, config, results_cam2, effect_roi, winName2, cam_id_2, true, logPath, timeStamp_ms, true);
 
-        for (auto box : results)
+        for (auto box : results_cam2)
         {
             if (box.label > 0)
             {
